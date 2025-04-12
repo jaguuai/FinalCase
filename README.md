@@ -1,0 +1,2 @@
+# FinalCase
+NewMindAi-Patika
