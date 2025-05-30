@@ -1,0 +1,24 @@
+title,date,excerpt,image_url,link,scrape_date
+"May 13, 2025 Loyalty-Based Expeditions are here! A new version of Expeditions is live! Read more",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/loyalty-expeditions,2025-05-30 12:41:10
+"May 07, 2025 How Blessings Will Impact Seekers' Journeys Find out how the Blessings will impact your experience! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/blessings-impact,2025-05-30 12:41:10
+"Apr 22, 2025 Introducing Dodorex - The Clumsy Neftie! A new Neftie has entered Tokane, introducing Dodorex! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/dodorex,2025-05-30 12:41:10
+"Apr 15, 2025 Patch 0.13.31 is now live! Big update introducing new long awaited features! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/patch-v01331,2025-05-30 12:41:10
+"Apr 15, 2025 Easter Update New big patch for our Easter Event! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/easter-patch,2025-05-30 12:41:10
+"Apr 09, 2025 Challenges Are Coming â A New Way to Play! Introducing Challenges, a new way to play! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/challenges,2025-05-30 12:41:10
+"Apr 02, 2025 A World of Choice & Challenge: Introducing Blessings Introducing the upcoming Blessings feature. READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/god-blessings,2025-05-30 12:41:10
+"Mar 25, 2025 Community Update #1: World Map We dive into the Worldmap, and how it will play a crucial role in your Seeker journey! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/worldmap,2025-05-30 12:41:10
+"Mar 19, 2025 Introducing Leaderboard Rewards Introducing ranked PvP rewards! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/leaderboard-rewards,2025-05-30 12:41:10
+"Feb 27, 2025 Aurory is heading to GDC Johnny, our Executive Producer, will be talking about his jump from traditional games to web3 on an exclusive Solana hosted panel! READ MORE",Date extraction needed,Content extraction needed,Image extraction needed,https://aurory.io/news/aurory-gdc-2025,2025-05-30 12:41:10
+Loyalty-Based Expeditions,Pattern match - Date TBD,Found pattern: Loyalty-Based Expeditions,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Blessings Will Impact,Pattern match - Date TBD,Found pattern: Blessings Will Impact,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Dodorex,Pattern match - Date TBD,Found pattern: Dodorex,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Easter Event,Pattern match - Date TBD,Found pattern: Easter Event,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Challenges,Pattern match - Date TBD,Found pattern: Challenges,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Worldmap,Pattern match - Date TBD,Found pattern: Worldmap,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+PvP rewards,Pattern match - Date TBD,Found pattern: PvP rewards,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Red Packet Pursuit,Pattern match - Date TBD,Found pattern: Red Packet Pursuit,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Chest Eggs,Pattern match - Date TBD,Found pattern: Chest Eggs,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Halloween Event,Pattern match - Date TBD,Found pattern: Halloween Event,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Chroma system,Pattern match - Date TBD,Found pattern: Chroma system,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Neftie Skins,Pattern match - Date TBD,Found pattern: Neftie Skins,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
+Collection Score,Pattern match - Date TBD,Found pattern: Collection Score,Pattern match - No image,https://aurory.io/news/,2025-05-30 12:41:10
