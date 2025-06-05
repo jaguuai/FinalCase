@@ -1,6 +1,6 @@
 import streamlit as st
 from utils import write_message
-from agent import generate_response, get_economic_summary # Import get_economic_summary
+from agent import generate_response # Import get_economic_summary
 
 # Page Config
 st.set_page_config("Aurory", page_icon="🎮")
@@ -8,9 +8,9 @@ st.set_page_config("Aurory", page_icon="🎮")
 # Set up Session State
 if "messages" not in st.session_state:
     # Call get_economic_summary() to get the initial comprehensive overview
-    initial_summary = get_economic_summary()
+    # initial_summary = get_economic_summary()
     st.session_state.messages = [
-        {"role": "assistant", "content": initial_summary},
+        {"role": "assistant", "content": "Ask me anything, Seeker—markets, votes, or Neftie power!"},
     ]
 
 # Submit handler
@@ -27,7 +27,6 @@ def handle_submit(message):
         # Call the agent
         response = generate_response(message)
         write_message('assistant', response)
-        
 
 # Display messages in Session State
 for message in st.session_state.messages:
@@ -35,7 +34,7 @@ for message in st.session_state.messages:
 
 
 # Handle any user input
-if prompt := st.chat_input("Come on"):
+if prompt := st.chat_input("Ask me anything, Seeker—markets, votes, or Neftie power!"):
     # Display user message in chat message container
     write_message('user', prompt)
 
