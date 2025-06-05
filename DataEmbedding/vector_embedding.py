@@ -14,7 +14,6 @@ import traceback
 # .env dosyasını yükle
 load_dotenv("C:/Users/alice/OneDrive/Masaüstü/P2E-Economy-Assistant-AuroryGame/neo4j.env")
 
-class VectorEmbeddingPipeline:
     def __init__(self):
         """
         Vector embedding pipeline with OpenAI using .env variables
