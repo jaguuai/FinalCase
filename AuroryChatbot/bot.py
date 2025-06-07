@@ -1,42 +1,104 @@
 import streamlit as st
 from utils import write_message
-from agent import generate_response # Import get_economic_summary
+from agent import generate_response
 
-# Page Config
-st.set_page_config("Aurory", page_icon="🎮")
+# --- Sayfa yapılandırması ---
+st.set_page_config(
+    page_title="Aurory Chatbot",
+    page_icon="🎮",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Set up Session State
-if "messages" not in st.session_state:
-    # Call get_economic_summary() to get the initial comprehensive overview
-    # initial_summary = get_economic_summary()
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Ask me anything, Seeker—markets, votes, or Neftie power!"},
-    ]
-
-# Submit handler
-def handle_submit(message):
+# --- CSS ile Buton ve Arka Plan Stilini Özelleştir ---
+st.markdown(
     """
-    Submit handler:
+    <style>
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        font-size: 18px;
+        border-radius: 12px;
+        padding: 10px 24px;
+        margin-top: 10px;
+        transition: background-color 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+    }
+    .stApp {
+        background-color: #f0f2f6;
+        color: #262730;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    You will modify this method to talk with an LLM and provide
-    context using data from Neo4j.
-    """
+# --- Sidebar Menü ---
+with st.sidebar:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Aurory_Logo.svg/120px-Aurory_Logo.svg.png", width=120)
+    st.title("Aurory Menü")
+    page = st.radio("Sayfa Seçimi:", ["Chatbot", "Hakkında", "İletişim"])
+    st.markdown("---")
+    st.write("🎮 Aurory P2E Ekonomi ve Topluluk Asistanı")
 
-    # Handle the response
-    with st.spinner('Thinking...'):
-        # Call the agent
-        response = generate_response(message)
-        write_message('assistant', response)
+# --- Chatbot Sayfası ---
+if page == "Chatbot":
+    # Session State Mesajları
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Ask me anything, Seeker—markets, votes, or Neftie power!"},
+        ]
 
-# Display messages in Session State
-for message in st.session_state.messages:
-    write_message(message['role'], message['content'], save=False)
+    # Mesaj yazdırma fonksiyonu, dışarıdan import edilen write_message yerine buraya koyabilirsin:
+    def write_message(role, content, save=True):
+        if role == "user":
+            st.markdown(f"**You:** {content}")
+        else:
+            st.markdown(f"**AuroryBot:** {content}")
+        if save:
+            st.session_state.messages.append({"role": role, "content": content})
 
+    # Submit handler
+    def handle_submit(message):
+        with st.spinner('Thinking...'):
+            response = generate_response(message)
+            write_message('assistant', response)
 
-# Handle any user input
-if prompt := st.chat_input("Ask me anything, Seeker—markets, votes, or Neftie power!"):
-    # Display user message in chat message container
-    write_message('user', prompt)
+    # Önceki mesajları göster
+    for msg in st.session_state.messages:
+        write_message(msg['role'], msg['content'], save=False)
 
-    # Generate a response
-    handle_submit(prompt)
+    # Kullanıcıdan input al
+    if prompt := st.chat_input("Soru yaz, Aurory ile ilgili her şey..."):
+        write_message('user', prompt)
+        handle_submit(prompt)
+
+    # Örnek buton
+    if st.button("Bana Tıkla!"):
+        st.success("Butona tıkladın! 🎉")
+    else:
+        st.info("Butona henüz basılmadı.")
+
+# --- Hakkında Sayfası ---
+elif page == "Hakkında":
+    st.title("Hakkında")
+    st.markdown(
+        """
+        Bu Aurory Chatbot, oyun içi ekonomi, DAO kararları ve NFT pazarı hakkında canlı bilgiler sağlar.
+        Token fiyatları, oylamalar ve topluluk analizleri için tasarlanmıştır.
+        """
+    )
+
+# --- İletişim Sayfası ---
+elif page == "İletişim":
+    st.title("İletişim")
+    st.markdown(
+        """
+        **E-posta:** support@aurorygame.com  
+        **Discord:** discord.gg/aurory  
+        **Twitter:** @aurorygame  
+        """
+    )
