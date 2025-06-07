@@ -10,25 +10,103 @@ You are an expert Neo4j developer specialized in the Aurory Play-to-Earn game ec
 Your task is to translate user questions into efficient Cypher queries that strictly follow the provided schema and relationship types.
 
 Guidelines:
-- Use only the relationship types and properties explicitly defined in the schema below.
-- Avoid using properties or relationships not present in the schema.
 - Do not wrap the generated Cypher query in quotation marks.
-- Do not return entire nodes or embedding data; return only relevant properties.
-- Use case-insensitive text matching when filtering by token names, symbols, or proposal titles.
-- When matching names that start with 'the', rearrange them to 'name, the' (e.g., "the aurory" → "aurory, the").
-- Use sensible LIMITs (default 20) to optimize performance.
+- Return only relevant properties, never entire nodes or embedding data.
+- Use case-insensitive matching when filtering by token names, symbols, or proposal titles.
+- When matching names starting with "the", rearrange to "name, the" (e.g., "the aurory" → "aurory, the").
+- Use sensible LIMITs (default to 20) for query performance.
 - Use OPTIONAL MATCH to safely handle missing relationships or properties.
-- Convert dates like 'today', 'last 24 hours', or specific days into Neo4j datetime filters.
-- When using Unix timestamps (epoch seconds), multiply by 1000 and use datetime({{epochMillis: ...}}).
-- Always alias relationships if you reference their properties (e.g., [r:HOLDS] if using r.amount).
-- When aggregating movements or transfers, group by wallet address and asset name if applicable.
-- Return only the properties relevant to the user's question (e.g., wallet address, amount, token name, timestamp).
-- When interpreting user intent like "move", "transfer", or "send", use the 'SENT' relationship between Wallet and Transaction nodes.
-- Use IS NOT NULL instead of exists() function for property existence checks.
+- Alias relationships if referencing their properties (e.g., [r:HOLDS] if using r.amount).
+- When aggregating transfers or movements, group results by wallet address and asset name, if applicable.
+- Return only properties relevant to the user's question (e.g., wallet address, amount, token name, timestamp).
+- Interpret intents like "move", "transfer", or "send" using the 'PERFORMED' relationship between Wallet and Transaction nodes.
+- Use IS NOT NULL instead of exists() to check for property existence.
 
-Example Cypher Statements:
+Example Cypher Queries:
 
+1 - To find game mechanics and their related documents and tokens:
+```
+MATCH (d:Document)-[*1..2]-(t:Token)-[*1..2]-(gt:GameToken)-[*1..2]-(gm:GameMechanic)
+RETURN 
+  d.documentType AS DocumentType,
+  t.name AS TokenName,
+  gt.name AS GameTokenName,
+  gm.description AS GameMechanic
+LIMIT 50
+```
 
+2 - To find tokens and game tokens discussed in tweets related to farming, yield, or rewards with high economic significance:
+```
+MATCH (d:Document)-[:DISCUSSES|REFERENCES|POTENTIAL_IMPACT]->(t:Token)-[:HAS_SUBTOKEN]->(gt:GameToken)
+WHERE d.documentType = "tweet" 
+  AND d.economicSignificance >= 3
+  AND (toLower(d.content) CONTAINS "farming" 
+       OR toLower(d.content) CONTAINS "yield" 
+       OR toLower(d.content) CONTAINS "reward")
+RETURN 
+  d.content AS FarmingStrategy,
+  t.name AS TokenName,
+  gt.name AS GameTokenName,
+  gt.symbol AS GameTokenSymbol,
+  d.economicSignificance AS StrategyValue
+ORDER BY d.economicSignificance DESC
+LIMIT 20
+```
+
+3 - To extract game strategies from documents (tweets) mentioning strategy, tactic, earning, gameplay, or tips:
+```
+MATCH (d:Document)
+WHERE d.documentType = "tweet" 
+  AND d.economicSignificance >= 2
+  AND (toLower(d.content) CONTAINS "strategy" 
+       OR toLower(d.content) CONTAINS "tactic" 
+       OR toLower(d.content) CONTAINS "earning" 
+       OR toLower(d.content) CONTAINS "gameplay"
+       OR toLower(d.content) CONTAINS "tip")
+RETURN 
+  d.content AS StrategyContent,
+  d.economicSignificance AS Importance,
+  d.retweet AS Engagement,
+  d.like AS Popularity,
+  d.eventType AS EventType
+ORDER BY d.economicSignificance DESC, d.retweet DESC
+LIMIT 20
+```
+
+4 - To find DAO proposals and related council discussions:
+```
+MATCH (d:Document)-[:DESCRIBES]->(p:Proposal)
+OPTIONAL MATCH (c:Council)-[:MEMBER_OF]-(cm:CouncilMember)
+WHERE d.documentType = "tweet" 
+  AND d.economicSignificance >= 3
+  AND (toLower(d.content) CONTAINS "proposal" 
+       OR toLower(d.content) CONTAINS "vote" 
+       OR toLower(d.content) CONTAINS "governance"
+       OR toLower(d.content) CONTAINS "dao")
+RETURN 
+  p.title AS ProposalTitle,
+  p.proposalId AS ProposalID,
+  d.content AS ProposalDiscussion,
+  c.name AS CouncilName,
+  cm.name AS CouncilMemberName,
+  d.economicSignificance AS ProposalImportance
+ORDER BY d.economicSignificance DESC
+LIMIT 20
+```
+
+5 - To find wallet transactions and NFT activities:
+```
+MATCH (w:Wallet)-[:PERFORMED]->(tx:Transaction)
+OPTIONAL MATCH (w)-[:BUYS|SELLS]->(nft:NftItem)
+WHERE w.userLevel IS NOT NULL
+RETURN 
+  w.address AS WalletAddress,
+  w.userLevel AS UserLevel,
+  count(DISTINCT tx) AS TransactionCount,
+  count(DISTINCT nft) AS NFTCount,
+  w.amount AS WalletBalance
+ORDER BY w.userLevel DESC, count(tx) DESC
+LIMIT 20
 ```
 
 Schema:
@@ -36,8 +114,8 @@ Schema:
 
 Question:
 {question}
-
 """
+
 
 cypher_prompt = PromptTemplate.from_template(CYPHER_GENERATION_TEMPLATE)
 

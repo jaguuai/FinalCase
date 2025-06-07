@@ -22,35 +22,29 @@ try:
             score,
             {
                 source: node.source,
-                doc_type: node.doc_type,
+                documentType: node.documentType,
                 title: node.title,
                 timestamp: node.timestamp,
-                author: node.author,
-                tags: node.tags,
+                economicSignificance: node.economicSignificance,
+               -
 
                 tokens_mentioned: 
-                    [ (token:Token)<-[:DESCRIBES]-(node) | token.name ] +
+                    [ (token:Token)<-[:DISCUSSES]-(node) | token.name ] +
                     [ (token:Token)<-[:REFERENCES]-(node) | token.name ] +
-                    [ (token:Token)<-[:AFFECTS]-(node) | token.name ] +
                     [ (token:Token)<-[:POTENTIAL_IMPACT]-(node) | token.name ],
 
-                nft_collection_mentioned: 
-                    [ (collection:Collection)-[:ABOUT]->(node) | collection.name ],
-
+                
                 proposal_related: 
                     [ (proposal:Proposal)<-[:DESCRIBES]-(node) | {
                         id: proposal.proposalId,
                         title: proposal.title
                     } ],
 
-                economic_impact: node.economicSignificance,
-
                 
 
                 source_url: CASE 
-                    WHEN node.doc_type = 'news' THEN node.source
                     WHEN node.doc_type = 'tweet' THEN 'https://twitter.com/tweet/' + node.tweet_id
-                    WHEN node.doc_type = 'dao' THEN 'https://gov.aurory.io/proposal/' + toString(node.proposal_id)
+                    WHEN node.documentType = 'dao_proposal' THEN 'https://gov.aurory.io/proposal/' + toString(node.proposalId)
                     ELSE node.source
                 END
             } AS metadata
@@ -58,7 +52,7 @@ try:
     )
 
     # Create the retriever
-    retriever = neo4jvector.as_retriever(search_kwargs={"k": 3})
+    retriever = neo4jvector.as_retriever()
 
     instructions = (
         "You are the Aurory Economy Strategy Assistant. Use the given context to provide economic insights about the Aurory game ecosystem. "

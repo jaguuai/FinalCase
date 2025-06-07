@@ -40,9 +40,9 @@ st.markdown(
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Aurory_Logo.svg/120px-Aurory_Logo.svg.png", width=120)
     st.title("Aurory Menü")
-    page = st.radio("Sayfa Seçimi:", ["Chatbot", "Hakkında", "İletişim"])
+    page = st.radio("Sayfa Seçimi:", ["Chatbot", "Hakkında"])
     st.markdown("---")
-    st.write("🎮 Aurory P2E Ekonomi ve Topluluk Asistanı")
+    st.write("🎮 Aurory P2E Strategi Asistanı")
 
 # --- Chatbot Sayfası ---
 if page == "Chatbot":
@@ -76,11 +76,7 @@ if page == "Chatbot":
         write_message('user', prompt)
         handle_submit(prompt)
 
-    # Örnek buton
-    if st.button("Bana Tıkla!"):
-        st.success("Butona tıkladın! 🎉")
-    else:
-        st.info("Butona henüz basılmadı.")
+ 
 
 # --- Hakkında Sayfası ---
 elif page == "Hakkında":
@@ -92,13 +88,3 @@ elif page == "Hakkında":
         """
     )
 
-# --- İletişim Sayfası ---
-elif page == "İletişim":
-    st.title("İletişim")
-    st.markdown(
-        """
-        **E-posta:** support@aurorygame.com  
-        **Discord:** discord.gg/aurory  
-        **Twitter:** @aurorygame  
-        """
-    )
