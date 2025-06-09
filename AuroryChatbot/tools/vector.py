@@ -17,34 +17,48 @@ try:
         text_node_property="content",
         embedding_node_property="embedding",
         retrieval_query="""
-        RETURN 
+        RETURN
             node.content AS text,
             score,
             {
                 source: node.source,
-                documentType: node.documentType,
+                docType: node.docType,
                 title: node.title,
-                timestamp: node.timestamp,
                 economicSignificance: node.economicSignificance,
-               -
+                influenceScore: node.influenceScore,
+                socialImpact: node.socialImpact,
+                eventType: node.eventType,
+                socialImpact: node.socialImpact,
+               
 
-                tokens_mentioned: 
+                tokens_mentioned:
                     [ (token:Token)<-[:DISCUSSES]-(node) | token.name ] +
                     [ (token:Token)<-[:REFERENCES]-(node) | token.name ] +
                     [ (token:Token)<-[:POTENTIAL_IMPACT]-(node) | token.name ],
 
-                
-                proposal_related: 
+                proposals_related:
                     [ (proposal:Proposal)<-[:DESCRIBES]-(node) | {
                         id: proposal.proposalId,
                         title: proposal.title
                     } ],
 
-                
+                nfts_related:
+                    [ (nftitem:NftItem)<-[:ABOUT]-(node) | {
+                        id: nftitem.id,
+                        status: nftitem.status,
+                        priceSOL: nftitem.priceSOL
+                    } ],
 
-                source_url: CASE 
-                    WHEN node.doc_type = 'tweet' THEN 'https://twitter.com/tweet/' + node.tweet_id
-                    WHEN node.documentType = 'dao_proposal' THEN 'https://gov.aurory.io/proposal/' + toString(node.proposalId)
+                game_mechanics_related:
+                    [ (gamemechanic:GameMechanic)<-[:MENTIONS]-(node) | {
+                        description: gamemechanic.description,
+                        name: gamemechanic.name
+                    } ],
+
+                source_url: CASE
+                    WHEN node.docType = 'news' THEN 'https://aurorydocs.xyz/news/' + node.id
+                    WHEN node.docType = 'tweet' THEN 'https://twitter.com/tweet/' + node.tweet_id
+                    WHEN node.docType = 'dao_proposal' THEN 'https://gov.aurory.io/proposal/' + toString(node.proposalId)
                     ELSE node.source
                 END
             } AS metadata
@@ -60,16 +74,16 @@ try:
         "If the context doesn't contain relevant Aurory economic data, say you need more specific information. "
         "Always include risk assessments and strategic recommendations when applicable. "
         "Context: {context}"
-    )   
+    )
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", instructions),
         ("human", "{input}"),
     ])
 
-    # Create the chain 
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    document_retriever = create_retrieval_chain(retriever, question_answer_chain)
+
+    document_qa_chain = create_stuff_documents_chain(llm, prompt)
+    document_retriever = create_retrieval_chain(retriever, document_qa_chain)
 
 except Exception as e:
     print(f"Error setting up vector search: {e}")

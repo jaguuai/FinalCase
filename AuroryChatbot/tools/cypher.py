@@ -1,9 +1,55 @@
+# Optimized version of cypher.py with simplified schema
+
 import streamlit as st
 from llm import llm
 from graph import graph
 from langchain_neo4j import GraphCypherQAChain
 from langchain.prompts.prompt import PromptTemplate
 from langchain.tools import Tool
+from langchain.callbacks.manager import CallbackManagerForChainRun
+
+# Simplified schema definition instead of full schema
+SIMPLIFIED_SCHEMA = """
+Nodes:
+- Document (properties: 
+    * content (text content)
+    * docType (tweet, news , dao_proposal)
+    * title (document title)
+    * source (source URL or identifier)
+    * timestamp (creation/publication time)
+    * influenceScore (numeric influence score)
+    * eventType (type of event)
+    * economicSignificance (economic impact assessment)
+    * socialImpact (social media impact metrics)
+    * tweet_id (for Twitter documents)
+    * proposalId (for DAO proposal documents)
+    )
+- Token (properties: name, symbol, coinType, volume24hUsd, percentChange24h, marketCapUsd)
+- Wallet (properties: address, amount, userLevel, transactionCount)
+- Transaction (properties: signature, timestamp, fee, slot)
+- NftItem (properties: id, priceSOL, timestamp, status, collection)
+- Proposal (properties: title, proposalId,status)
+- Council (properties: description, electionCycle)
+- GameMechanic (properties: name, description)
+- CommunityMember (properties: twitter, name, role)
+
+Relationships:
+- Document-[:DISCUSSES|REFERENCES|POTENTIAL_IMPACT]->Token
+- Document-[:MENTIONS]->GameMechanic  
+- Document-[:ABOUT]->NftItem
+- Document-[:DESCRIBES]->Proposal
+- Wallet-[:HOLDS]->Token 
+- Wallet-[:SELLS]->NftItem 
+- Wallet-[:BUYS]->NftItem 
+- Wallet-[:PERFORMED]->Transaction
+- Token-[:HAS_SUBTOKEN]->GameToken
+- Token-[:HAS_LIFECYCLE]->GameMechanic
+- GameMechanic-[:REQUIRES]->GameToken
+- GameMechanic-[:REWARDS]->GameToken
+- GameMechanic-[:CONSUMES]->GameToken
+- Council-[:MEMBER_OF]->CommunityMember
+- CommunityMember-[:OWNS]->Wallet
+"""
 
 CYPHER_GENERATION_TEMPLATE = """
 You are an expert Neo4j developer specialized in the Aurory Play-to-Earn game ecosystem.
@@ -20,94 +66,30 @@ Guidelines:
 - When aggregating transfers or movements, group results by wallet address and asset name, if applicable.
 - Return only properties relevant to the user's question (e.g., wallet address, amount, token name, timestamp).
 - Interpret intents like "move", "transfer", or "send" using the 'PERFORMED' relationship between Wallet and Transaction nodes.
-- Use IS NOT NULL instead of exists() to check for property existence.
+- Use IS NOT NULL instead of EXISTS to check for property existence.
+- **When a question implies "social media", "tweets", or "news", filter Document nodes by `docType` properties like 'tweet', 'news'. For "proposals", "governance", or "DAO discussions", filter by `docType = 'dao_proposal'`.**
+-When a question involves event, filter Document nodes by `docType` properties 'news'.
+-When a question involves "player" or "user" actions, treat them as Wallet nodes. 
 
 Example Cypher Queries:
 
-1 - To find game mechanics and their related documents and tokens:
-```
-MATCH (d:Document)-[*1..2]-(t:Token)-[*1..2]-(gt:GameToken)-[*1..2]-(gm:GameMechanic)
-RETURN 
-  d.documentType AS DocumentType,
-  t.name AS TokenName,
-  gt.name AS GameTokenName,
-  gm.description AS GameMechanic
-LIMIT 50
+1 - To find documents with high influence scores:
+ ```
+MATCH (d:Document)-[:DISCUSSES|REFERENCES|POTENTIAL_IMPACT]->(t:Token)
+WHERE d.influenceScore IS NOT NULL
+RETURN d.content, d.influenceScore, t.name
+ORDER BY d.influenceScore DESC
+LIMIT 5
 ```
 
-2 - To find tokens and game tokens discussed in tweets related to farming, yield, or rewards with high economic significance:
+2 - To find game mechanics mentioned in documents:
 ```
-MATCH (d:Document)-[:DISCUSSES|REFERENCES|POTENTIAL_IMPACT]->(t:Token)-[:HAS_SUBTOKEN]->(gt:GameToken)
-WHERE d.documentType = "tweet" 
-  AND d.economicSignificance >= 3
-  AND (toLower(d.content) CONTAINS "farming" 
-       OR toLower(d.content) CONTAINS "yield" 
-       OR toLower(d.content) CONTAINS "reward")
-RETURN 
-  d.content AS FarmingStrategy,
-  t.name AS TokenName,
-  gt.name AS GameTokenName,
-  gt.symbol AS GameTokenSymbol,
-  d.economicSignificance AS StrategyValue
-ORDER BY d.economicSignificance DESC
-LIMIT 20
+MATCH (d:Document)-[:MENTIONS]->(gm:GameMechanic)
+RETURN d.content, gm.name, gm.description
+LIMIT 10
 ```
 
-3 - To extract game strategies from documents (tweets) mentioning strategy, tactic, earning, gameplay, or tips:
-```
-MATCH (d:Document)
-WHERE d.documentType = "tweet" 
-  AND d.economicSignificance >= 2
-  AND (toLower(d.content) CONTAINS "strategy" 
-       OR toLower(d.content) CONTAINS "tactic" 
-       OR toLower(d.content) CONTAINS "earning" 
-       OR toLower(d.content) CONTAINS "gameplay"
-       OR toLower(d.content) CONTAINS "tip")
-RETURN 
-  d.content AS StrategyContent,
-  d.economicSignificance AS Importance,
-  d.retweet AS Engagement,
-  d.like AS Popularity,
-  d.eventType AS EventType
-ORDER BY d.economicSignificance DESC, d.retweet DESC
-LIMIT 20
-```
 
-4 - To find DAO proposals and related council discussions:
-```
-MATCH (d:Document)-[:DESCRIBES]->(p:Proposal)
-OPTIONAL MATCH (c:Council)-[:MEMBER_OF]-(cm:CouncilMember)
-WHERE d.documentType = "tweet" 
-  AND d.economicSignificance >= 3
-  AND (toLower(d.content) CONTAINS "proposal" 
-       OR toLower(d.content) CONTAINS "vote" 
-       OR toLower(d.content) CONTAINS "governance"
-       OR toLower(d.content) CONTAINS "dao")
-RETURN 
-  p.title AS ProposalTitle,
-  p.proposalId AS ProposalID,
-  d.content AS ProposalDiscussion,
-  c.name AS CouncilName,
-  cm.name AS CouncilMemberName,
-  d.economicSignificance AS ProposalImportance
-ORDER BY d.economicSignificance DESC
-LIMIT 20
-```
-
-5 - To find wallet transactions and NFT activities:
-```
-MATCH (w:Wallet)-[:PERFORMED]->(tx:Transaction)
-OPTIONAL MATCH (w)-[:BUYS|SELLS]->(nft:NftItem)
-WHERE w.userLevel IS NOT NULL
-RETURN 
-  w.address AS WalletAddress,
-  w.userLevel AS UserLevel,
-  count(DISTINCT tx) AS TransactionCount,
-  count(DISTINCT nft) AS NFTCount,
-  w.amount AS WalletBalance
-ORDER BY w.userLevel DESC, count(tx) DESC
-LIMIT 20
-```
 
 Schema:
 {schema}
@@ -116,83 +98,86 @@ Question:
 {question}
 """
 
-
-cypher_prompt = PromptTemplate.from_template(CYPHER_GENERATION_TEMPLATE)
-
-# Custom function to clean generated Cypher
-def clean_generated_cypher(generated_cypher):
-    """Clean the generated cypher by removing explanatory text"""
-    lines = generated_cypher.strip().split('\n')
-    cypher_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        # Skip empty lines and explanatory text
-        if not line:
-            continue
-        # Skip lines that look like explanations
-        if (line.startswith('The ') or 
-            line.startswith('According to') or 
-            line.startswith('Based on') or
-            line.startswith('Here is') or
-            line.startswith('This query') or
-            'correct' in line.lower() or
-            'schema' in line.lower() or
-            line.startswith('```') or
-            line.startswith('Cypher Query:')):
-            continue
-        # If line starts with a Cypher keyword, we're good
-        cypher_keywords = ['MATCH', 'RETURN', 'WHERE', 'WITH', 'ORDER', 'LIMIT', 'SKIP', 'UNION', 'CREATE', 'MERGE', 'DELETE', 'DETACH', 'SET', 'REMOVE', 'OPTIONAL', 'UNWIND', 'CALL']
-        if any(line.upper().startswith(keyword) for keyword in cypher_keywords):
-            cypher_lines.append(line)
-        elif cypher_lines:  # If we already have cypher lines, this might be a continuation
-            cypher_lines.append(line)
-    
-    # Join the cleaned cypher
-    cleaned_cypher = '\n'.join(cypher_lines)
-    
-    if not cleaned_cypher.strip():
-        # Fallback: try to find cypher in the original text
-        import re
-        cypher_match = re.search(r'(MATCH.*?)(?:\n\n|\Z)', generated_cypher, re.DOTALL | re.IGNORECASE)
-        if cypher_match:
-            cleaned_cypher = cypher_match.group(1).strip()
-        else:
-            cleaned_cypher = generated_cypher.strip()
-    
-    return cleaned_cypher
-
-# Create a custom GraphCypherQAChain with better error handling for newer LangChain versions
 class CustomGraphCypherQAChain(GraphCypherQAChain):
-    def _call(self, inputs, run_manager=None):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Ensure all required attributes are properly set
+        if not hasattr(self, 'llm') and 'llm' in kwargs:
+            self.llm = kwargs['llm']
+
+    def _call(
+        self,
+        inputs: dict[str, str],
+        run_manager = None,
+    ) -> dict[str, str]:
+        _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
+        callbacks = _run_manager.get_child()
+        
         try:
-            # Get the generated cypher using invoke instead of run
-            cypher_input = {
-                "question": inputs[self.input_key], 
-                "schema": self.graph.schema
+            # Use simplified schema instead of full schema
+            chain_inputs = {
+                "question": inputs[self.input_key],
+                "schema": SIMPLIFIED_SCHEMA  # Use our simplified schema
             }
+
+            # Generate the Cypher query with robust error handling
+            try:
+                if hasattr(self.cypher_generation_chain, 'invoke'):
+                    intermediate_result = self.cypher_generation_chain.invoke(
+                        chain_inputs,
+                        callbacks=callbacks
+                    )
+                    # Handle different return types robustly
+                    if isinstance(intermediate_result, dict):
+                        cleaned_cypher = intermediate_result.get("text", intermediate_result.get("output", str(intermediate_result)))
+                    elif isinstance(intermediate_result, str):
+                        cleaned_cypher = intermediate_result
+                    else:
+                        # Handle other types (like AIMessage objects)
+                        cleaned_cypher = getattr(intermediate_result, 'content', str(intermediate_result))
+                else:
+                    cleaned_cypher = self.cypher_generation_chain.run(
+                        question=chain_inputs["question"],
+                        schema=chain_inputs["schema"],
+                        callbacks=callbacks
+                    )
+            except Exception as chain_error:
+                print(f"Cypher generation error: {chain_error}")
+                return {
+                    self.output_key: f"Failed to generate Cypher query: {str(chain_error)}",
+                    "generated_cypher_query": None
+                }
+
+            # Clean the cypher query
+            if "```cypher" in cleaned_cypher:
+                cleaned_cypher = cleaned_cypher.split("```cypher")[1].split("```")[0].strip()
+            elif "```" in cleaned_cypher:
+                cleaned_cypher = cleaned_cypher.split("```")[1].strip()
+
+            if self.verbose:
+                _run_manager.on_text(f"Generated Cypher: {cleaned_cypher}\n", verbose=self.verbose)
             
-            # Use invoke instead of run for newer LangChain versions
-            if hasattr(self.cypher_generation_chain, 'invoke'):
-                generated_cypher = self.cypher_generation_chain.invoke(cypher_input)
-            else:
-                generated_cypher = self.cypher_generation_chain.run(**cypher_input)
-            
-            # Handle different return types
-            if isinstance(generated_cypher, dict):
-                generated_cypher = generated_cypher.get('text', str(generated_cypher))
-            elif not isinstance(generated_cypher, str):
-                generated_cypher = str(generated_cypher)
-            
-            # Clean the generated cypher
-            cleaned_cypher = clean_generated_cypher(generated_cypher)
-            
-            print(f"Original generated cypher: {generated_cypher}")
-            print(f"Cleaned cypher: {cleaned_cypher}")
-            
-            # Execute the cleaned cypher
-            context = self.graph.query(cleaned_cypher)[: self.top_k]
-            
+            # Execute the cleaned cypher with proper error handling
+            try:
+                # CRITICAL FIX: Check if graph is string (connection error)
+                if isinstance(self.graph, str):
+                    raise ValueError(f"Graph connection failed: {self.graph}")
+                
+                # Check if graph has required methods
+                if not hasattr(self.graph, 'query') or not callable(self.graph.query):
+                    raise AttributeError(f"Graph object doesn't have a callable query method")
+                
+                # Execute the query
+                context = self.graph.query(cleaned_cypher)[: self.top_k]
+                    
+            except Exception as query_error:
+                print(f"Query execution error: {query_error}")
+                # Return detailed error information
+                return {
+                    self.output_key: f"Database query failed: {str(query_error)}. Please check your Neo4j connection and try again.",
+                    "generated_cypher_query": cleaned_cypher
+                }
+
             if run_manager:
                 run_manager.on_text("Generated Cypher:", end="\n", verbose=self.verbose)
                 run_manager.on_text(cleaned_cypher, color="green", end="\n", verbose=self.verbose)
@@ -210,16 +195,80 @@ class CustomGraphCypherQAChain(GraphCypherQAChain):
             if isinstance(result, dict):
                 result = result.get('text', str(result))
             
-            return {self.output_key: result}
+            return {
+                self.output_key: result,
+                "generated_cypher_query": cleaned_cypher
+            }
             
         except Exception as e:
             print(f"Error in cypher execution: {e}")
-            return {self.output_key: f"I encountered an error while querying the database: {str(e)}. Please try rephrasing your question."}
+            return {
+                self.output_key: f"I encountered an error while querying the database: {str(e)}. Please check your Neo4j connection.",
+                "generated_cypher_query": None
+            }
 
-cypher_qa = CustomGraphCypherQAChain.from_llm(
-    llm,
-    graph=graph,
-    verbose=True,
-    cypher_prompt=cypher_prompt,
-    allow_dangerous_requests=True
+
+CYPHER_GENERATION_PROMPT = PromptTemplate(
+    template=CYPHER_GENERATION_TEMPLATE,
+    input_variables=["schema", "question"]
 )
+
+def validate_graph_connection(graph_obj):
+    """Check if graph object is valid Neo4j connection"""
+    if isinstance(graph_obj, str):
+        st.error(f"❌ Graph connection error: {graph_obj}")
+        return False
+    try:
+        # Simple validation query
+        graph_obj.query("RETURN 1 AS test")
+        return True
+    except Exception as e:
+        st.error(f"🔌 Neo4j Connection Failed: {str(e)}")
+        return False
+
+# Alternative approach: Get schema dynamically but filter it
+def get_filtered_schema(graph_obj):
+    """Get only essential schema information"""
+    try:
+        # Get basic node labels and relationship types
+        nodes_query = "CALL db.labels() YIELD label RETURN collect(label) as labels"
+        relationships_query = "CALL db.relationshipTypes() YIELD relationshipType RETURN collect(relationshipType) as types"
+        
+        node_labels = graph_obj.query(nodes_query)[0]['labels']
+        rel_types = graph_obj.query(relationships_query)[0]['types']
+        
+        # Create a minimal schema representation
+        schema_info = f"""
+Node Labels: {', '.join(node_labels)}
+Relationship Types: {', '.join(rel_types)}
+
+Key Properties per Node:
+- Document: content, docType, influenceScore , eventType
+- Token: name, symbol, volume24hUsd, marketCapUsd  
+- Wallet: address, amount, userLevel
+- Transaction: signature, timestamp, fee
+- NftItem: priceSOL, timestamp, status
+"""
+        return schema_info
+    except:
+        return SIMPLIFIED_SCHEMA
+
+# Chain initialization with proper error handling
+if validate_graph_connection(graph):
+    try:
+        cypher_qa = CustomGraphCypherQAChain.from_llm(
+            llm=llm,
+            graph=graph,
+            cypher_prompt=CYPHER_GENERATION_PROMPT,
+            verbose=True,
+            return_intermediate_steps=True,
+            allow_dangerous_requests=True,
+        )
+        print("✅ Cypher QA Chain initialized successfully")
+    except Exception as e:
+        st.error(f"Failed to initialize Cypher QA chain: {str(e)}")
+        print(f"Chain initialization error: {e}")
+        cypher_qa = None
+else:
+    st.error("Cannot initialize Cypher QA chain due to graph connection issues")
+    cypher_qa = None
