@@ -5,7 +5,7 @@ This project is a chatbot developed to provide analysis and strategic consultanc
 The project contains two main expert agents:
 
 - **DAO Expert**  
-  Analyzes DAO governance proposals and provides insights based on community sentiment.
+  Analyzes DAO governance proposals.
 
 - **Gaming Strategist**  
   Offers guidance on token economics, NFT marketplace, and in-game earning mechanisms.
