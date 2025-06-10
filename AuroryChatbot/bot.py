@@ -1,10 +1,82 @@
 import streamlit as st
-from agent import generate_response # Bu modülün var olduğunu varsayıyorum
+from agent import generate_response 
 import time
 import uuid
 from datetime import datetime, timedelta
 import requests
 from pytz import timezone
+from langchain_neo4j import Neo4jChatMessageHistory
+from langchain_core.messages import AIMessage, HumanMessage
+import os
+from graph import graph 
+from utils import write_message 
+from utils import get_session_id 
+
+def get_all_sessions_from_neo4j():
+    """
+    Neo4j'den tüm sohbet oturumlarını ve ilk mesajlarını çeker.
+    """
+    if isinstance(graph, str): # graph objesi bağlantı hatası yüzünden string ise
+        st.error(f"Neo4j bağlantı hatası nedeniyle geçmiş yüklenemiyor: {graph}")
+        return []
+
+    query = """
+    MATCH (s:Session)
+    RETURN s.id AS sessionId
+    ORDER BY s.id DESC 
+    """
+    try:
+        results = graph.query(query)
+        
+        sessions_data = []
+        for record in results:
+            sessions_data.append({
+                "id": record["sessionId"],
+               
+            })
+        return sessions_data
+    except Exception as e:
+        st.error(f"Neo4j'den oturumları çekerken hata oluştu: {e}")
+        return []
+
+def get_session_messages_from_neo4j(session_id):
+    """
+    Belirli bir oturuma ait tüm mesajları Neo4j'den çeker.
+    """
+    if isinstance(graph, str): # graph objesi bağlantı hatası yüzünden string ise
+        st.error(f"Neo4j bağlantı hatası nedeniyle mesajlar yüklenemiyor: {graph}")
+        return []
+
+    history_manager = Neo4jChatMessageHistory(session_id=session_id, graph=graph)
+    messages = history_manager.messages # LangChain'in mesaj formatında döner
+
+    formatted_messages = []
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            formatted_messages.append({"role": "user", "content": msg.content})
+        elif isinstance(msg, AIMessage):
+            formatted_messages.append({"role": "assistant", "content": msg.content})
+    return formatted_messages
+
+def delete_session_from_neo4j(session_id):
+    """
+    Belirli bir oturumu ve bağlı tüm mesajları Neo4j'den siler.
+    """
+    if isinstance(graph, str):
+        st.error(f"Neo4j bağlantı hatası nedeniyle oturum silinemiyor: {graph}")
+        return False
+    
+    query = f"""
+    MATCH (s:Session {{id: '{session_id}'}})
+    DETACH DELETE s
+    """
+    try:
+        graph.query(query)
+        return True
+    except Exception as e:
+        st.error(f"Oturumu silerken hata oluştu: {e}")
+        return False
+
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -287,31 +359,37 @@ AGENTS = {
     }
 }
 
-# --- Utility Functions ---
 def init_session_state():
-    """Initialize all session state variables"""
-    defaults = {
-        "messages": [],
-        "selected_agent": "🎮 Gaming Strategist",
-        "show_query_details": False,
-        "show_timestamps": True,
-        "theme": "dark",
-        "auto_scroll": True,
-        "system_status": "online",
-        "processing": False,
-        "session_id": str(uuid.uuid4()),
-        "user_preferences": {
-            "notifications": True,
-            "sound": False,
-            "compact_mode": False
-        },
-        "current_page": "💬 Chat",
-        "chat_history": []
-    }
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = get_session_id()  # Bu satırı aktif hale getirin
+    if "user_input_key" not in st.session_state:
+        st.session_state.user_input_key = 0
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "💬 Chat"
+    if "selected_history_session_id" not in st.session_state:
+        st.session_state.selected_history_session_id = None
+    if "agent_name" not in st.session_state:
+        st.session_state.agent_name = "aurory-assistant"
+    if "is_new_chat_session" not in st.session_state:
+        st.session_state.is_new_chat_session = True
+    if "selected_agent" not in st.session_state:
+        st.session_state.selected_agent = "🏛️ DAO Expert"
+    if "processing" not in st.session_state:
+        st.session_state.processing = False
     
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    # EKSİK OLAN DEĞİŞKENLER:
+    if "show_query_details" not in st.session_state:
+        st.session_state.show_query_details = False
+    if "show_timestamps" not in st.session_state:
+        st.session_state.show_timestamps = True
+    if "auto_scroll" not in st.session_state:
+        st.session_state.auto_scroll = True
+    if "system_status" not in st.session_state:
+        st.session_state.system_status = "online"
+    if "user_preferences" not in st.session_state:
+        st.session_state.user_preferences = {"notifications": True}
 
 def validate_user_input(user_input: str) -> tuple[bool, str]:
     """Enhanced input validation with comprehensive checks"""
@@ -379,44 +457,9 @@ def append_message_to_session_state(role, content, agent_id=None, query_details=
     }
     st.session_state.messages.append(message_data)
 
-def save_chat_to_history():
-    """Save current chat session to history"""
-    if len(st.session_state.messages) > 0:
-        qa_pairs = []
-        current_question = None
-        
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                current_question = message
-            elif message["role"] == "assistant" and current_question:
-                qa_pairs.append({
-                    "question": current_question["content"],
-                    "answer": message["content"],
-                    "timestamp": current_question["timestamp"],
-                    "agent": message.get("agent_id", "unknown"),
-                    "query_details": message.get("query_details"),
-                    "generated_cypher_query": message.get("generated_cypher_query")
-                })
-                current_question = None
-        
-        if qa_pairs:
-            chat_session = {
-                "id": st.session_state.session_id,
-                "timestamp": datetime.now().isoformat(),
-                "qa_pairs": qa_pairs,
-                "total_questions": len(qa_pairs)
-            }
-            
-            if "chat_history" not in st.session_state:
-                st.session_state.chat_history = []
-            
-            st.session_state.chat_history.insert(0, chat_session)
-            if len(st.session_state.chat_history) > 50:
-                st.session_state.chat_history.pop()
 
 def clear_current_chat():
     """Clear current chat and start new session"""
-    save_chat_to_history()
     st.session_state.messages = []
     st.session_state.session_id = str(uuid.uuid4())
     st.rerun()
@@ -573,20 +616,30 @@ def display_enhanced_sidebar():
         # Chat sayfasında gösterilecek özel kontroller
         if st.session_state.current_page == "💬 Chat":
             # Seçili agent bilgisi
-            selected_agent_info = AGENTS[st.session_state.selected_agent]
+            selected_agent_info = AGENTS[st.session_state.selected_agent] 
             st.markdown("**Selected Agent:**")
             st.markdown(f"{st.session_state.selected_agent}")
-
             
             st.markdown("---")
             
-        # Chat kontrolleri
-        if st.button("🆕 New Chat", use_container_width=True):
-            clear_current_chat()
-        
-        if st.button("💾 Save Chat", use_container_width=True):
-            save_chat_to_history()
-            st.toast("✅ Chat saved to history!")
+        # BU BÖLÜMDE HATA VAR - DÜZELTİLMİŞ HALİ:
+        if st.button("➕ New Chat", use_container_width=True, key="new_chat_button"):
+            # YALNIZCA SOHBETLE İLGİLİ STATE'LERİ SIFIRLA
+            st.session_state.messages = [] # Görüntülenen mesajları temizle
+            st.session_state.session_id = get_session_id() # Yeni bir session ID oluştur
+            st.session_state.user_input_key += 1 # Giriş kutusu için yeni bir anahtar
+            st.session_state.is_new_chat_session = True # Yeni sohbet olduğunu işaretle
+    
+            # Sayfayı sohbet olarak ayarla
+            st.session_state.current_page = "💬 Chat"
+
+            # Geçmişten seçili bir oturum varsa temizle
+            if "selected_history_session_id" in st.session_state:
+                del st.session_state.selected_history_session_id
+                
+            st.rerun() # Uygulamayı yeniden çalıştır
+
+        # GEREKSIZ TEKRAR EDEN KODLAR KALDIRILDI
         
         st.markdown("---")
         
@@ -602,11 +655,8 @@ def display_enhanced_sidebar():
         if current_page != st.session_state.current_page:
             st.session_state.current_page = current_page
             st.rerun()
-        
+            
         st.markdown("---")
-        
-      
-          
         
         # Advanced Options
         st.markdown("**Advanced Options:**")
@@ -634,10 +684,10 @@ def display_enhanced_sidebar():
         st.markdown("### 📊 System Status")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Sessions", len(st.session_state.get('chat_history', [])))
+            total_sessions = len(get_all_sessions_from_neo4j())
+            st.metric("Sessions", total_sessions)
         with col2:
             st.metric("Messages", len(st.session_state.messages))
-
 def display_chat_interface():
     """Main chat interface with enhanced features"""
   
@@ -654,13 +704,6 @@ def display_chat_interface():
     else:
         st.markdown("""
         ### 👋 Welcome to Aurory Assistant!
-        
-        I'm here to help you with:
-        - **Economic Analysis** - Token economics and market insights
-        - **Gaming Strategies** - P2E optimization and Neftie management  
-        - **DAO Governance** - Proposal analysis and voting insights
-     
-        
         Choose an agent above and ask your first question!
         """)
     
@@ -836,98 +879,70 @@ def display_market_interface():
                 if st.button(f"🔍 View {collection_name} on Magic Eden", key=f"view_{collection_symbol}"):
                     st.markdown(f"[Open Magic Eden Collection](https://magiceden.io/marketplace/{collection_symbol})")
             
-         
 
 def display_history_interface():
-    """Chat history interface"""
     st.title("📚 Chat History")
-    
-    if not st.session_state.get('chat_history'):
-        st.markdown("""
-        ### 📝 No Chat History Yet
+
+    if "selected_history_session_id" not in st.session_state or st.session_state.selected_history_session_id is None:
+        # Tüm oturumları gösterme mantığı
+        st.subheader("All Chat Sessions")
+        all_sessions = get_all_sessions_from_neo4j()
+
+        if not all_sessions:
+            st.info("No chat sessions found in the database. Start a conversation in the 'Chat' tab!")
+            return
+
+        for session_info in all_sessions:
+            session_id = session_info["id"]
+            with st.expander(f"**Oturum ID:** `{session_id}`"):
+                if st.button(f"Bu Oturumu Görüntüle", key=f"view_session_{session_id}"):
+                    st.session_state.selected_history_session_id = session_id
+                    st.session_state.current_page = "📚 History"
+                    st.rerun()
+                if st.button(f"Bu Oturumu Sil", key=f"delete_session_{session_id}"):
+                    delete_session_from_neo4j(session_id)
+                    if "selected_history_session_id" in st.session_state and st.session_state.selected_history_session_id == session_id:
+                        del st.session_state.selected_history_session_id
+                    st.success(f"Oturum `{session_id}` silindi.")
+                    st.rerun()
+
+    else: # Belirli bir oturum seçildiğinde bu blok çalışır
+        session_id = st.session_state.selected_history_session_id
+        st.subheader(f"History for Session ID: `{session_id}`")
         
-        Your conversation history will appear here after you:
-        - Have conversations with the assistant
-        - Save chats manually
-        - Complete chat sessions
-        
-        Start chatting to build your history!
-        """)
-        return
-    
-    # History controls
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        search_query = st.text_input("🔍 Search chat history...", key="history_search")
-    with col2:
-        sort_order = st.selectbox("Sort by:", ["Newest First", "Oldest First"], key="history_sort")
-    with col3:
-        if st.button("🗑️ Clear All History", key="clear_history"):
-            st.session_state.chat_history = []
+        if st.button("⬅️ Back to All Sessions"):
+            del st.session_state.selected_history_session_id
             st.rerun()
-    
-    st.markdown("---")
-    
-    # Filter and sort history
-    filtered_history = st.session_state.chat_history.copy()
-    
-    if search_query:
-        filtered_history = [
-            session for session in filtered_history
-            if any(search_query.lower() in qa['question'].lower() or 
-                   search_query.lower() in qa['answer'].lower()
-                   for qa in session['qa_pairs'])
-        ]
-    
-    if sort_order == "Oldest First":
-        filtered_history.reverse()
-    
-    # Display history
-    if not filtered_history:
-        st.info("No chat sessions match your search criteria.")
-        return
-    
-    for session in filtered_history:
-        with st.expander(
-            f"💬 Chat Session - {len(session['qa_pairs'])} questions - "
-            f"{format_timestamp(session['timestamp'])}", 
-            expanded=False
-        ):
-            for i, qa in enumerate(session['qa_pairs']):
-                # Question
-                st.markdown(f"""
-                <div class="history-card">
-                    <div class="history-question">❓ {qa['question']}</div>
-                    <div class="history-response">🤖 {qa['answer'][:200]}{'...' if len(qa['answer']) > 200 else ''}</div>
-                    <div class="history-meta">
-                        <span>{format_timestamp(qa['timestamp'])}</span>
-                        <span class="history-agent">{qa.get('agent', 'Unknown Agent')}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Show full answer if clicked
-                if st.button(f"Show Full Answer", key=f"show_full_{session['id']}_{i}"):
-                    st.markdown(f"**Full Response:**\n\n{qa['answer']}")
-                
-                # Show query details if available
-                if qa.get('query_details') and st.button(f"Show Details", key=f"show_details_{session['id']}_{i}"):
-                    details = qa['query_details']
-                    st.json(details)
-                
-                # Show generated Cypher query if available
-                if qa.get('generated_cypher_query') and st.button(f"Show Query", key=f"show_query_{session['id']}_{i}"):
-                    st.code(qa['generated_cypher_query'], language='cypher')
-                
-                if i < len(session['qa_pairs']) - 1:
-                    st.markdown("---")
+
+        # MESAJLARIN ÇEKİLDİĞİ YER
+        messages = get_session_messages_from_neo4j(session_id)
+        
+
+
+        if not messages:
+            st.warning(f"No messages found for session `{session_id}`.")
+            return
+
+        # Mesajları görüntüleme döngüsü
+        for msg in messages:
+            if isinstance(msg, dict):
+                write_message(msg["role"], msg["content"], save=False)
+            elif isinstance(msg, HumanMessage):
+                write_message("user", msg.content, save=False)
+            elif isinstance(msg, AIMessage):
+                write_message("assistant", msg.content, save=False)
+
 
 def main():
     """Main application logic"""
+    # init_session_state fonksiyonunu çağırarak oturum durumunu başlat
     init_session_state()
-    display_enhanced_sidebar()
     
-    # Page routing
+    # Gelişmiş kenar çubuğunu görüntüle
+    # Hata ayıklama için yorum satırı yaptığımız satırı geri açıyoruz
+    display_enhanced_sidebar() 
+    
+    # Sayfa yönlendirme mantığı
     if st.session_state.current_page == "💬 Chat":
         display_chat_interface()
     elif st.session_state.current_page == "📈 Market":
