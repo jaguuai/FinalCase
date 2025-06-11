@@ -11,6 +11,10 @@ The project contains two main expert agents:
   Offers guidance on token economics, NFT marketplace, and in-game earning mechanisms.
 
 ---
+## Technical Architecture
+
+[![Neo4j Schema](technical_architecture.png)](https://github.com/jaguuai/FinalCase/blob/main/technical_architecture.png)
+
 
 ## Data Modeling and Transfer
 
@@ -33,6 +37,10 @@ The project contains two main expert agents:
 ### Neo4j Schema Visualization
 
 [![Neo4j Schema](neo4j_shema.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4j_shema.png)
+
+[![Neo4j Schema](neo4J1.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4J1.png)
+
+[![Neo4j Schema](neo4J2.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4J2.png)
 
 ---
 
