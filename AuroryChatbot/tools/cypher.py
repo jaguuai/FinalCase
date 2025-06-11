@@ -1,5 +1,3 @@
-# Simplified version of cypher.py using LangChain's built-in schema
-
 import streamlit as st
 from llm import llm
 from graph import graph

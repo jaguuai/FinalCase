@@ -78,7 +78,7 @@ def delete_session_from_neo4j(session_id):
         return False
 
 
-# --- Page Configuration ---
+# Page Configuration 
 st.set_page_config(
     page_title="Aurory Assistant",
     page_icon="🎮",
@@ -341,7 +341,7 @@ h1, h2, h3, h4, h5, h6 {
 </style>
 """, unsafe_allow_html=True)
 
-# --- Agent Configuration ---
+#Agent Configuration 
 AGENTS = {
     "🏛️ DAO Expert": {
         "id": "dao",
@@ -468,7 +468,7 @@ def handle_submit(message):
     """Enhanced message processing with detailed analytics"""
     is_valid, error_message = validate_user_input(message)
     if not is_valid:
-        append_message_to_session_state('assistant', f"⚠️ {error_message}")
+        append_message_to_session_state('assistant', f" {error_message}")
         st.rerun()
         return
     
@@ -765,7 +765,7 @@ def display_message(message):
             with st.expander("🔍 Generated Cypher Query", expanded=False):
                 st.code(message['generated_cypher_query'], language='cypher')
 
-# Market sayfası fonksiyonları
+# Market page functions
 AURORY_COLLECTIONS = {
     "Aurorians": "aurory"
 }

@@ -1,12 +1,11 @@
 # LangChain imports
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.prompts import PromptTemplate
 from langchain.schema import StrOutputParser
 from langchain.tools import Tool
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_neo4j import Neo4jChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.messages import AIMessage, HumanMessage # Ekstra import
+
 
 # Local imports
 from llm import llm
@@ -38,7 +37,7 @@ chat_prompt = ChatPromptTemplate.from_messages(
         ("human", "{input}"),
     ]
 )
-# --- DAO Expert Prompt ---
+# DAO Expert Prompt 
 dao_system_message = ChatPromptTemplate.from_messages(
     [
         ("system",
@@ -55,11 +54,11 @@ dao_system_message = ChatPromptTemplate.from_messages(
          "- Insights into voter behavior\n"
          "- Clear and concise language, avoiding speculation."
         ),
-        ("human", "{input}"), # Bu input Agent Executor'dan gelen input ile çakışabilir, aşağıdaki düzeltmede bu mesajı çıkaracağız.
+        ("human", "{input}"), 
     ]
 )
 
-# --- Gaming Strategist Prompt ---
+# Gaming Strategist Prompt 
 gaming_system_message = ChatPromptTemplate.from_messages(
     [
         (
@@ -115,7 +114,7 @@ tools = [
         "content_type options: 'news', 'tweets', 'dao', or 'all'\n"
         "Example: semantic_search(query='NERITE utility', content_type='tweets')"
     ),
-        func=get_document # get_document fonksiyonu doğrudan çağrılabilir bir fonksiyon olarak kalabilir
+        func=get_document 
     ),
     Tool.from_function(
         name="Aurory Game Information",
@@ -124,7 +123,7 @@ tools = [
             "Use this tool for any inquiries involving tokenomics, NFT markets, DAO proposals, player strategies, or economic data within the Aurory ecosystem.\n"
             "Always rely on this tool when structured, up-to-date data from the Neo4j knowledge graph is needed."
         ),
-        func=cypher_qa.invoke # cypher_qa bir zincir olduğu için .invoke() kullanıldı
+        func=cypher_qa.invoke 
     )
 ]
 
@@ -133,8 +132,7 @@ tools = [
 def get_memory(session_id):
     return Neo4jChatMessageHistory(session_id=session_id, graph=graph)
 
-# Agent'ın ana ReAct prompt içeriği (bu kısım doğru şekilde string olarak tanımlanmış)
-# Bu, agent'ın düşünme ve araç kullanma formatını belirler.
+
 react_agent_structure_content = """TOOLS:
 ------
 
@@ -174,30 +172,24 @@ New input: {input}
 {agent_scratchpad}
 """
 
-# Hata veren `agent_prompt = PromptTemplate.from_template(agent_prompt)` satırı kaldırıldı.
-# `agent_prompt` artık doğrudan agent oluşturmada kullanılmayacak, içeriği kullanılacak.
 
 
-# --- Agent Oluşturma ---
-# Her bir agent için özel ChatPromptTemplate'ler oluşturun
+# Create agents
 
-# DAO Expert Agent için birleştirilmiş prompt
+
+# for  DAO Expert Agent 
 dao_agent_combined_prompt = ChatPromptTemplate.from_messages([
-    ("system", dao_system_message.messages[0].prompt.template), # DAO'ya özel sistem mesajı
-    # Human mesajı olarak ReAct yapısını ekleyin
-    # Not: {input} ve {chat_history} AgentExecutor tarafından sağlanacak
+    ("system", dao_system_message.messages[0].prompt.template), 
     ("human", react_agent_structure_content)
 ])
 
-# Gaming Strategist Agent için birleştirilmiş prompt
+# for Gaming Strategist Agent 
 gaming_agent_combined_prompt = ChatPromptTemplate.from_messages([
-    ("system", gaming_system_message.messages[0].prompt.template), # Gaming'e özel sistem mesajı
-    # Human mesajı olarak ReAct yapısını ekleyin
+    ("system", gaming_system_message.messages[0].prompt.template),
     ("human", react_agent_structure_content)
 ])
 
-# Agent'ları oluşturun
-# --- DAO Expert Agent ---
+
 dao_agent = create_react_agent(llm, tools, dao_agent_combined_prompt) # Birleştirilmiş prompt kullanıldı
 dao_agent_executor = AgentExecutor(
     agent=dao_agent,
@@ -213,7 +205,7 @@ dao_chat_agent = RunnableWithMessageHistory(
     history_messages_key="chat_history",
 )
 
-# --- Gaming Strategist Agent ---
+
 gaming_agent = create_react_agent(llm, tools, gaming_agent_combined_prompt) # Birleştirilmiş prompt kullanıldı
 gaming_agent_executor = AgentExecutor(
     agent=gaming_agent,
@@ -229,7 +221,7 @@ gaming_chat_agent = RunnableWithMessageHistory(
     history_messages_key="chat_history",
 )
 
-# Agent'ları bir dictionary'de tutun
+# Keep agents in a dictionary
 AGENTS_EXEC = {
     "dao": dao_chat_agent,
     "gaming": gaming_chat_agent,
@@ -237,7 +229,7 @@ AGENTS_EXEC = {
 
 # Create a handler to call the agent
 
-def generate_response(user_input: str, agent_id: str = "gaming") -> dict: # <-- Dönüş tipini dict olarak değiştirin
+def generate_response(user_input: str, agent_id: str = "gaming") -> dict: 
     """
     Agent'ı seçilen agent_id'ye göre çağırır ve yanıt ile birlikte
     oluşturulan Cypher sorgusunu (varsa) döndürür.
