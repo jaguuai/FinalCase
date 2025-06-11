@@ -84,5 +84,5 @@ Relationship types established between nodes such as `Document`, `Token`, `Propo
 - OpenAI’s `text-embedding-ada-002` model is used for vector embeddings.
 - Neo4j database version must be at least 4.4.0, otherwise some features may not work.
 
-[![Neo4j Schema](main_page.png)](https://github.com/jaguuai/FinalCase/blob/main/chatbot.png)
+[![Neo4j Schema](chatbot.png)](https://github.com/jaguuai/FinalCase/blob/main/chatbot.png)
 
