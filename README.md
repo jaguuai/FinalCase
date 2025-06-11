@@ -40,7 +40,8 @@ The project contains two main expert agents:
 
 [![Neo4j Schema](neo4J1.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4J1.png)
 
-[![Neo4j Schema](neo4J2.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4J2.png)
+
+[![Neo4j Schema](neo4J2.png)](https://github.com/jaguuai/FinalCase/blob/main/neo4j2.png)
 
 ---
 
