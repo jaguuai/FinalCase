@@ -1,0 +1,290 @@
+CREATE CONSTRAINT proposal_id_unique IF NOT EXISTS
+FOR (p:Proposal)
+REQUIRE p.proposalId IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 
+'https://raw.githubusercontent.com/jaguuai/FinalCase/main/DataGathering/data_collection/daory_proposals_titles.csv' 
+AS row
+MERGE (p:Proposal {proposalId: toInteger(row.proposal_number)})
+SET p.title = row.title;
+
+CREATE CONSTRAINT wallet_address_unique IF NOT EXISTS
+FOR (w:Wallet)
+REQUIRE w.address IS UNIQUE;
+
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/main/DataGathering/data_collection/aury_data_wallets.csv' AS row
+MERGE (w:Wallet {address: row["address:ID"]})
+SET w.amount = toInteger(row.amount),
+    w.uiAmount = toFloat(row.ui_amount),
+    w.transactioncount = toInteger(row.tx_count);
+
+
+CREATE CONSTRAINT transaction_signature_unique IF NOT EXISTS
+FOR (t:Transaction)
+REQUIRE t.signature IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/main/DataGathering/data_collection/aury_data_transactions.csv' AS row
+MERGE (tx:Transaction {signature: row["signature:ID"]})
+SET tx.timestamp = toInteger(row.timestamp),
+    tx.slot = toInteger(row.slot),
+    tx.fee = toInteger(row.fee)
+MERGE (sender:Wallet {address: row.sender})
+MERGE (sender)-[:SENT]->(tx);
+
+
+CREATE CONSTRAINT collection_name_unique IF NOT EXISTS
+FOR (c:Collection)
+REQUIRE c.name IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/main/DataGathering/data_collection/aurory_nft_stats.csv' AS row
+MERGE (c:Collection {name: row.collection})
+SET c.floorPriceSOL = CASE WHEN row.floor_price_SOL <> '' THEN toFloat(row.floor_price_SOL) ELSE null END,
+    c.tradeVolumeSOL = CASE WHEN row.trade_volume_SOL <> '' THEN toFloat(row.trade_volume_SOL) ELSE null END,
+    c.mintRateEventsPerSec = CASE WHEN row.mint_rate_events_per_sec <> '' THEN toFloat(row.mint_rate_events_per_sec) ELSE null END,
+    c.lastMintTime = CASE WHEN row.last_mint_time <> '' THEN datetime(row.last_mint_time) ELSE null END,
+    c.timestamp = CASE WHEN row.timestamp <> '' THEN datetime(row.timestamp) ELSE null END
+
+
+CREATE CONSTRAINT token_name_unique IF NOT EXISTS
+FOR (t:Token)
+REQUIRE t.name IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/refs/heads/main/DataGathering/data_collection/solana_coins.csv' AS row
+WITH row, toFloat(row.usd) AS usd, toFloat(row.try) AS try,
+     toFloat(row.eur) AS eur, toFloat(row.jpy) AS jpy,
+     toFloat(row.gbp) AS gbp, toFloat(row.market_cap_usd) AS market_cap,
+     toFloat(row.volume_24h_usd) AS volume, toFloat(row.percent_change_24h) AS change
+
+MERGE (t:Token {name: row.coin})  // coin adına göre benzersiz Token düğümü oluştur
+SET t.coin_type = row.coin_type,
+    t.source = row.source,
+    t.timestamp = datetime(row.timestamp),
+    t.usd = usd,
+    t.try = try,
+    t.eur = eur,
+    t.jpy = jpy,
+    t.gbp = gbp,
+    t.marketCapUsd = market_cap,
+    t.volume24hUsd = volume,
+    t.percentChange24h = change
+""
+
+
+CREATE CONSTRAINT game_token_symbol_unique IF NOT EXISTS
+FOR (t:GameToken)
+REQUIRE t.symbol IS UNIQUE
+
+MERGE (staking:GameMechanic { type: 'staking' })
+SET staking += {
+    name: 'AURY Staking Pool',
+    description: 'Stake AURY tokens to earn XAURY rewards',
+    min_amount: 100,
+    reward_token: 'XAURY',
+    apy: 5.0,
+    lock_period: 7,
+    compound_frequency: 'daily'
+}
+
+
+MERGE (crafting:GameMechanic { type: 'crafting' })
+SET crafting += {
+    name: 'Item Crafting System',
+    description: 'Use NERITE to craft and enhance game items',
+    cost_per_craft: 50,
+    success_rate: 85,
+    daily_attempts: 5,
+    enhancement_bonus: 0.15
+}
+
+MERGE (battle:GameMechanic { type: 'battle' })
+SET battle += {
+    name: 'PvP Battle System',
+    description: 'Spend EMBER to enter battles and tournaments',
+    entry_cost: 10,
+    reward_multiplier: 1.5,
+    streak_bonus: 0.10,
+    tournament_multiplier: 2.0
+}
+
+MERGE (leveling:GameMechanic { type: 'leveling' })
+SET leveling += {
+    name: 'Character Progression',
+    description: 'Use WISDOM to level up characters and unlock abilities',
+    base_cost: 10,
+    level_multiplier: 1.2,
+    max_level: 100,
+    skill_points_per_level: 3
+}
+
+MATCH (aury:Token {name: "aurory"}), (xaury:GameToken {symbol: 'XAURY'})
+MERGE (aury)-[:GENERATES {mechanism: 'staking', rate: 0.05}]->(xaury)
+
+MATCH (aury:Token {name: "aurory"}), (nerite:GameToken {symbol: 'NERITE'})
+MERGE (aury)-[:ENABLES {activity: 'crafting'}]->(nerite)
+
+MATCH (aury:Token {name: "aurory"}), (wisdom:GameToken {symbol: 'WISDOM'})
+MERGE (aury)-[:ENABLES {activity: 'leveling'}]->(wisdom)
+
+MATCH (aury:Token {name: "aurory"}), (ember:GameToken {symbol: 'EMBER'})
+MERGE (aury)-[:ENABLES {activity: 'battle'}]->(ember)
+
+
+MATCH (staking:GameMechanic {type: 'staking'})
+WITH staking
+MATCH (aury:Token {name: 'aurory'})
+MERGE (staking)-[:REQUIRES]->(aury)
+
+MATCH (staking:GameMechanic {type: 'staking'})
+WITH staking
+MATCH (xaury:GameToken {symbol: 'XAURY'})
+MERGE (staking)-[:REWARDS]->(xaury)
+
+MATCH (crafting:GameMechanic {type: 'crafting'})
+WITH crafting
+MATCH (nerite:GameToken {symbol: 'NERITE'})
+MERGE (crafting)-[:CONSUMES]->(nerite)
+
+MATCH (battle:GameMechanic {type: 'battle'})
+WITH battle
+MATCH (ember:GameToken {symbol: 'EMBER'})
+MERGE (battle)-[:REQUIRES]->(ember)
+MERGE (battle)-[:REWARDS]->(ember)
+
+MATCH (leveling:GameMechanic {type: 'leveling'})
+WITH leveling
+MATCH (wisdom:GameToken {symbol: 'WISDOM'})
+MERGE (leveling)-[:CONSUMES]->(wisdom)
+
+MATCH (w:Wallet)
+WITH w, w.userLevel AS lvl
+
+WITH w, lvl,
+     CASE
+       WHEN lvl >= 8 AND lvl <= 15 THEN 10 + toInteger(rand() * 90)
+       WHEN lvl >= 16 AND lvl <= 30 THEN 100 + toInteger(rand() * 400)
+       WHEN lvl >= 31 AND lvl <= 53 THEN 500 + toInteger(rand() * 500)
+       ELSE 0
+     END AS randomAmount
+
+WITH w, randomAmount, toFloat(randomAmount) / 1000 AS uiAmount
+
+MATCH (ember:GameToken {symbol: 'EMBER'})
+MERGE (w)-[:HOLDS {amount: randomAmount, uiAmount: uiAmount, last_updated: datetime()}]->(ember)
+
+CREATE CONSTRAINT council_name_unique IF NOT EXISTS
+FOR (c:Council)
+REQUIRE c.name IS UNIQUE;
+
+MERGE (c:Council {name: "DAOry Council"})
+SET c.electionCycle = "6 months",
+    c.description = "Elected every 6 months by Aurorian holders";
+
+CREATE CONSTRAINT councilmember_name_unique IF NOT EXISTS
+FOR (m:CouncilMember)
+REQUIRE m.name IS UNIQUE
+
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/refs/heads/main/DataGathering/game_data/council.csv' AS row
+MERGE (m:CouncilMember {name: row.Name})
+SET m.role = row.Role,
+    m.twitter = row.`Twitter URL`
+
+// 5 en yüksek amount'lu wallet'ı sırala
+MATCH (w:Wallet)
+WITH w
+ORDER BY w.amount DESC
+LIMIT 5
+WITH collect(w) AS wallets
+
+// 5 CouncilMember sırala (örneğin isim sırasına göre)
+MATCH (m:CouncilMember)
+WITH wallets, collect(m) AS members
+WHERE size(wallets) = size(members)  // 5 üye ve 5 wallet olduğundan emin ol
+
+// index bazlı eşleştir ve ilişki yarat
+UNWIND range(0, size(members)-1) AS idx
+WITH members[idx] AS member, wallets[idx] AS wallet
+MERGE (member)-[:OWNS]->(wallet)
+RETURN member.name, wallet.address
+
+
+MATCH (w:Wallet)
+OPTIONAL MATCH (w)-[holdEmber:HOLDS]->(ember:GameToken {symbol: 'EMBER'})
+WITH w, w.amount AS totalAmount, 
+     CASE WHEN holdEmber IS NULL THEN 0 ELSE holdEmber.amount END AS emberAmount
+
+WITH w, totalAmount, emberAmount, (totalAmount - emberAmount) AS remainingAmount
+
+
+MATCH (w:Wallet)
+OPTIONAL MATCH (w)-[holdEmber:HOLDS]->(ember:GameToken {symbol: 'EMBER'})
+WITH w, w.amount AS totalAmount, 
+     CASE WHEN holdEmber IS NULL THEN 0 ELSE holdEmber.amount END AS emberAmount
+
+WITH w, totalAmount, emberAmount, (totalAmount - emberAmount) AS remainingAmount
+
+// Token node'larını çek
+MATCH (xa:GameToken {symbol: 'XAURY'}),
+      (nr:GameToken {symbol: 'NERITE'}),
+      (ws:GameToken {symbol: 'WISDOM'})
+
+// Random dağılım hesapla
+CALL {
+    WITH remainingAmount
+    RETURN 
+        toInteger(remainingAmount * 0.4 * (0.9 + rand()*0.2)) AS xaAmount,
+        toInteger(remainingAmount * 0.3 * (0.9 + rand()*0.2)) AS nrAmount,
+        toInteger(remainingAmount * 0.3 * (0.9 + rand()*0.2)) AS wsAmount
+}
+
+// EMBER ilişkisini güncelle
+MERGE (w)-[rEmber:HOLDS]->(ember)
+SET rEmber.amount = emberAmount, rEmber.last_updated = datetime()
+
+// XAURY ilişkisini oluştur/güncelle
+MERGE (w)-[rXA:HOLDS]->(xa)
+SET rXA.amount = xaAmount, rXA.last_updated = datetime()
+
+// NERITE ilişkisini oluştur/güncelle
+MERGE (w)-[rNR:HOLDS]->(nr)
+SET rNR.amount = nrAmount, rNR.last_updated = datetime()
+
+// WISDOM ilişkisini oluştur/güncelle
+MERGE (w)-[rWS:HOLDS]->(ws)
+SET rWS.amount = wsAmount, rWS.last_updated = datetime()
+
+
+MATCH (c:Council {name: "DAOry Council"})
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/jaguuai/FinalCase/refs/heads/main/DataGathering/game_data/advisors.csv' AS row
+
+MERGE (m:CouncilMember {name: row.Name})
+SET m.role = 'Advisor',
+    m.twitter = CASE 
+                 WHEN row.`Twitter URL` IS NULL OR trim(row.`Twitter URL`) = '' THEN '' 
+                 ELSE row.`Twitter URL` 
+                END
+
+MERGE (m)-[:MEMBER_OF]->(c)
+
+RETURN m.name, m.role, m.twitter
+
+
+CREATE CONSTRAINT nftitem_id_unique IF NOT EXISTS
+FOR (n:NftItem)
+REQUIRE n.id IS UNIQUE;
+
+LOAD CSV WITH HEADERS FROM "https://raw.githubusercontent.com/jaguuai/FinalCase/refs/heads/main/DataGathering/data_collection/nft_data_final.csv" AS row
+
+MERGE (nft:NftItem {id: toInteger(row.id)})
+SET nft.price_sol = toFloat(row.price_sol),
+    nft.collection = row.collection,
+    nft.marketplace = row.marketplace,
+    nft.status = row.status,
+    nft.timestamp = datetime(replace(row.timestamp, " ", "T"))
+
+WITH nft, row
+WHERE row.seller IS NOT NULL AND row.seller <> ""
+MATCH (seller:Wallet {address: row.seller})
+MERGE (seller)-[:SELLS]->(nft)

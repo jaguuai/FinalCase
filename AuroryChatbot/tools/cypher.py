@@ -20,7 +20,7 @@ Guidelines:
 - Return only properties relevant to the user's question (e.g., wallet address, amount, token name, timestamp).
 - Interpret intents like "move", "transfer", or "send" using the 'PERFORMED' relationship between Wallet and Transaction nodes.
 - Use IS NOT NULL instead of EXISTS to check for property existence.
-- **When a question implies "social media", "tweets", or "news", filter Document nodes by `docType` properties like 'tweet', 'news'. For "proposals", "governance", or "DAO discussions", filter by `docType = 'dao_proposal'`.**
+- **When a question implies "social media", "tweets", or "news", filter Document nodes by `docType` properties like 'tweet', 'news'. **
 - When a question involves event, filter Document nodes by `docType` properties 'news'.
 - When a question involves "player" or "user" actions, treat them as Wallet nodes.
 - Avoid returning embedding properties or large text fields unless specifically requested.
