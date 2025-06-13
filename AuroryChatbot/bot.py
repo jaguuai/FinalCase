@@ -12,6 +12,7 @@ from graph import graph
 from utils import write_message 
 from utils import get_session_id 
 
+#for history 
 def get_all_sessions_from_neo4j():
     """
     Neo4j'den tüm sohbet oturumlarını ve ilk mesajlarını çeker.
@@ -86,6 +87,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+#UI design
 st.markdown("""
 <style>
 @import url('https://fonts.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');

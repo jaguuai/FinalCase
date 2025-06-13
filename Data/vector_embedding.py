@@ -17,7 +17,7 @@ load_dotenv("C:/Users/alice/OneDrive/Masaüstü/FinalCase/neo4j.env")
 class VectorEmbeddingPipeline:
     def __init__(self):
         """
-        OpenAI kullanarak .env değişkenleri ile vektör gömme hattı
+        Vector embedding pipeline with .env variables using OpenAI
         """
         self.neo4j_uri = os.getenv("NEO4J_URI")
         self.neo4j_user = os.getenv("NEO4J_USERNAME")
@@ -41,7 +41,7 @@ class VectorEmbeddingPipeline:
         )
 
     def test_connection(self) -> bool:
-        """Neo4j bağlantısını test eder."""
+        """Tests the Neo4j connection."""
         try:
             with self.driver.session() as session:
                 session.run("MATCH (n) RETURN n LIMIT 1") # Basit bir sorgu ile bağlantıyı test et
@@ -54,8 +54,8 @@ class VectorEmbeddingPipeline:
 
     def process_pdf_documents(self, pdf_folder_path: str) -> List[Document]:
         """
-        Belirtilen klasördeki PDF dosyalarını işler ve LangChain Document nesneleri listesi döndürür.
-        DAO önerileri için proposal_id'yi dosya adından çıkarmaya çalışır.
+       Processes PDF files in the specified folder and returns a list of LangChain Document objects.
+       For DAO proposals, it tries to extract the proposal_id from the file name.
         """
         documents = []
         
@@ -64,8 +64,7 @@ class VectorEmbeddingPipeline:
                 file_path = os.path.join(pdf_folder_path, filename)
                 try:
                     proposal_id = None
-                    # Dosya adından proposal_id çıkarmak için regex kullanılır.
-                    # Örnek: "DAOry Proposal #7.docx.pdf" -> "7"
+                 # Using regex to extract proposal id from file name / Example: "DAİry Proposal #7.docx.pdf" -> "7"
                     match = re.search(r'#(\d+)', filename) 
                     if match:
                         proposal_id = match.group(1) 
@@ -105,8 +104,8 @@ class VectorEmbeddingPipeline:
 
     def process_csv_data(self, csv_files: List[str]) -> List[Document]:
         """
-        Belirtilen CSV dosyalarını işler ve LangChain Document nesneleri listesi döndürür.
-        Dosya adına göre (haber veya tweet) özel işleme yöntemlerini çağırır.
+           Processes the specified CSV files and returns a list of LangChain Document objects.
+           Calls custom processing methods based on file name (news or tweet).
         """
         documents = []
         
@@ -137,7 +136,7 @@ class VectorEmbeddingPipeline:
         return documents
 
     def _process_news_csv(self, df: pd.DataFrame, source_file: str) -> List[Document]:
-        """Haber CSV verilerini işler ve Document nesneleri döndürür."""
+    """Processes News CSV data and returns Document objects."""
         documents = []
         
         for _, row in df.iterrows():
@@ -172,7 +171,7 @@ class VectorEmbeddingPipeline:
         return documents
 
     def _process_tweet_csv(self, df: pd.DataFrame, source_file: str) -> List[Document]:
-        """Tweet CSV verilerini işler ve Document nesneleri döndürür."""
+     """Tweet processes CSV data and returns Document objects."""
         documents = []
         
         for _, row in df.iterrows():
@@ -208,7 +207,7 @@ class VectorEmbeddingPipeline:
         return documents
 
     def classify_event_type(self, content: str) -> str:
-        """İçeriği analiz ederek olayın türünü belirler."""
+      """Determines the type of event by analyzing the content."""
         content_lower = content.lower()
         
         # Anahtar kelimelere dayalı basit sınıflandırma
@@ -225,7 +224,7 @@ class VectorEmbeddingPipeline:
             return 'general'
 
     def assess_economic_impact(self, content: str, event_type: str) -> int:
-        """Bir içeriğin ekonomik etkisini 1-5 arası bir skorla değerlendirir."""
+     """Evaluates the economic impact of a piece of content on a scale of 1-5."""
         content_lower = content.lower()
         score = 1
         
@@ -249,7 +248,7 @@ class VectorEmbeddingPipeline:
 
     def analyze_tweet_economy(self, tweet_text: str) -> Dict[str, Any]:
         """
-        Bir tweet'in ekonomik içeriğini (sadece bahsedilen tokenlar) analiz eder.
+        Analyzes the economic content of a tweet (only tokens mentioned).
         """
         tweet_lower = tweet_text.lower()
         
@@ -263,7 +262,7 @@ class VectorEmbeddingPipeline:
         }
 
     def assess_tweet_impact(self, tweet_text: str, economy_analysis: Dict[str, Any]) -> int:
-        """Bir tweet'in ekonomik etkisini değerlendirir."""
+        """Evaluates the economic impact of a tweet."""
         tweet_lower = tweet_text.lower()
         score = 1
         
@@ -292,7 +291,7 @@ class VectorEmbeddingPipeline:
 
     def store_documents_in_neo4j(self, documents: List[Document]):
         """
-        İşlenen belgeleri Neo4j'ye kaydeder ve vektör indeksini oluşturur.
+        Saves the processed documents to Neo4j and creates the vector index.
         """
         print(f"\n--- {len(documents)} belge Neo4j'ye yazılıyor... ---")
         try:
@@ -315,8 +314,7 @@ class VectorEmbeddingPipeline:
 
     def create_document_relationships(self):
         """
-        Neo4j'deki Document düğümleri ile diğer düğümler (Token, Proposal, GameMechanic) arasında
-        ilişkiler oluşturur.
+        Creates relationships between Document nodes in Neo4j and other nodes (Token, Proposal, GameMechanic).
         """
         print("\n--- Belge ilişkileri oluşturuluyor... ---")
         try:
@@ -333,7 +331,7 @@ class VectorEmbeddingPipeline:
                 print("✅ DAO Proposal-Document bağlantıları kuruldu (:DESCRIBES)")
 
                 # 2. Token ile ilişkiler (tweetler ve haberler için)
-                # :DISCUSSES - genel olarak bahsedilen tokenlar
+            
                 query_token_discusses = """
                 MATCH (d:Document)
                 WHERE d.doc_type IN ['tweet', 'news'] AND d.tokens IS NOT NULL
@@ -345,17 +343,7 @@ class VectorEmbeddingPipeline:
                 session.run(query_token_discusses)
                 print("✅ Tweet/News-Token bağlantıları kuruldu (:DISCUSSES)")
 
-                # :AFFECTS - haberler için (Ekonomik Önem > 2 olanlar)
-                query_token_affects_news = """
-                MATCH (d:Document)
-                WHERE d.doc_type = 'news' AND d.economic_significance >= 2 AND d.tokens IS NOT NULL
-                UNWIND d.tokens AS tokenName
-                MATCH (t:Token)
-                WHERE toLower(t.name) CONTAINS toLower(tokenName) OR toLower(t.symbol) CONTAINS toLower(tokenName)
-                MERGE (d)-[:AFFECTS]->(t)
-                """
-                session.run(query_token_affects_news)
-                print("✅ News-Token bağlantıları kuruldu (:AFFECTS) [Ekonomik Önem >= 2]")
+      
                 
                 # :POTENTIAL_IMPACT - tweetler için (Ekonomik Önem > 3 olanlar)
                 query_token_potential_impact_tweet = """
@@ -371,14 +359,12 @@ class VectorEmbeddingPipeline:
 
 
                 # Haberler ile GameMechanic İlişkileri
-                # Haber içeriğindeki GameMechanic anahtar kelimelerini kullanarak ilişkilendirme
+
                 game_mechanics = session.run("MATCH (gm:GameMechanic) RETURN gm.name AS name").data()
                 game_mechanic_names = [gm['name'].lower() for gm in game_mechanics if gm['name']]
 
                 if game_mechanic_names:
-                    # Dinamik olarak sorguyu oluştur
-                    # Bu sorgu her bir haber dokümanı için GameMechanic adlarını kontrol eder.
-                    # Eğer doküman içeriğinde GameMechanic adı geçiyorsa ilişki kurar.
+
                     query_news_game_mechanic = f"""
                     MATCH (d:Document)
                     WHERE d.doc_type = 'news'
@@ -393,17 +379,6 @@ class VectorEmbeddingPipeline:
                     print("⚠️ Neo4j'de hiç GameMechanic bulunamadı, News-GameMechanic ilişkisi oluşturulmadı.")
 
 
-                # Tweetler ile Proposal İlişkileri (Duygu ile birlikte)
-                # Tweet metadata'sındaki proposal_id'yi kullanarak ilişkilendirme
-                query_tweet_proposal_sentiment = """
-                MATCH (d:Document)
-                WHERE d.doc_type = 'tweet' AND d.proposal_id IS NOT NULL
-                MATCH (p:Proposal {proposalId: d.proposal_id})
-                MERGE (d)-[r:DISCUSSES_PROPOSAL]->(p)
-                SET r.sentiment_score = d.economic_significance // Tweet'in ekonomik önemini duygu skoru olarak kullan
-                """
-                session.run(query_tweet_proposal_sentiment)
-                print("✅ Tweet-Proposal bağlantıları kuruldu (:DISCUSSES_PROPOSAL) [Duygu Skoru ile]")
 
             print("✅ Tüm belge ilişkileri başarıyla oluşturuldu.")
         except Exception as e:
@@ -411,13 +386,9 @@ class VectorEmbeddingPipeline:
             traceback.print_exc()
 
     def semantic_search(self, query_text: str, limit: int = 5, filters: Dict[str, Any] = None, score_threshold: float = 0.65) -> List[Document]:
-        """
-        Belirtilen sorgu metnine göre anlamsal arama yapar ve isteğe bağlı filtreler uygular.
-        score_threshold: Döndürülecek dokümanların sahip olması gereken minimum benzerlik puanı.
-        """
+      # Performs semantic search based on the specified query text and applies optional filters.
         try:
-            # Neo4jVector nesnesini oluştur, burada retrieval_query'ye karmaşık WHERE clause koymuyoruz.
-            # Sadece temel döndürme sorgusu ve index bilgileri ile oluşturuyoruz.
+            
             vector_store = Neo4jVector.from_existing_index(
                 embedding=self.embedding_model,
                 url=self.neo4j_uri,
@@ -426,8 +397,7 @@ class VectorEmbeddingPipeline:
                 index_name="aurory_docs",
                 text_node_property="content",
                 embedding_node_property="embedding",
-                # retrieval_query burada daha basit olabilir, sadece ne döndürüleceğini belirtir.
-                # Filtreleri Python tarafında uygulayacağız.
+     
                 retrieval_query="""
                     RETURN node.content AS text, score, {
                         source: node.source,
@@ -448,18 +418,18 @@ class VectorEmbeddingPipeline:
                 """
             )
 
-            # Benzerlik araması yapar. İlk olarak daha fazla aday alıyoruz (limit * 5 veya daha fazla),
-            # çünkü filtreleme sonrası yeterli sonuç kalmayabilir.
-            # Bu kısım sadece vektör benzerliğine göre çalışır.
-            docs_and_scores = vector_store.similarity_search_with_score(query_text, k=limit * 5) # Yeterli aday almak için k'yı artır
+# Performs similarity search. First we get more candidates (limit * 5 or more),
+# because there may not be enough results after filtering.
+# This part only works based on vector similarity.
+            docs_and_scores = vector_store.similarity_search_with_score(query_text, k=limit * 5) 
 
             filtered_results = []
             for doc, score in docs_and_scores:
-                # Önce skor eşiğini kontrol et
+
                 if score < score_threshold:
                     continue
 
-                # Ardından Python içinde meta veri filtrelerini uygula
+
                 metadata = doc.metadata
                 match_filters = True
 
@@ -490,7 +460,7 @@ class VectorEmbeddingPipeline:
                 if match_filters:
                     filtered_results.append(doc)
                 
-                if len(filtered_results) >= limit: # İstenilen limite ulaşıldığında dur
+                if len(filtered_results) >= limit: 
                     break
             
             return filtered_results
@@ -499,98 +469,7 @@ class VectorEmbeddingPipeline:
             traceback.print_exc()
             return []
 
-    def get_dao_proposal_info(self, proposal_id: str, limit: int = 5) -> Dict[str, List[Document]]:
-        """
-        Belirli bir DAO önerisi için ilgili belgeleri ve topluluk tepkisini getirir.
-        """
-        print(f"\n--- DAO Önerisi '{proposal_id}' için arama başlatılıyor ---")
-        results = {}
-
-        # DAO önerisi ile ilgili belgeleri arar
-        proposal_query = f"DAO Proposal {proposal_id} details and community discussion."
-        proposal_filters = {"doc_type": "dao_proposal", "proposal_id": proposal_id}
-        proposal_docs = self.semantic_search(proposal_query, limit=limit, filters=proposal_filters)
-        results["proposal_docs"] = proposal_docs
-        print(f"✅ {len(proposal_docs)} adet DAO önerisi dokümanı bulundu.")
-
-        # Bu öneri hakkındaki tweetleri arar (topluluk tepkisi için)
-        tweet_query = f"Community sentiment, discussion, and engagement on DAO Proposal {proposal_id} on Twitter."
-        tweet_filters = {"doc_type": "tweet", "proposal_id": proposal_id, "economic_significance_min": 1}
-        proposal_tweets = self.semantic_search(tweet_query, limit=limit, filters=tweet_filters)
-        results["proposal_tweets"] = proposal_tweets
-        print(f"✅ {len(proposal_tweets)} adet DAO önerisi tweet'i bulundu.")
-
-        return results
-
-    def get_token_market_sentiment(self, token_name: str, limit: int = 5) -> Dict[str, List[Document]]:
-        """
-        Belirli bir token için piyasa duyarlılığını ve ilgili sosyal medya/haberleri getirir.
-        """
-        print(f"\n--- Token '{token_name}' için piyasa duyarlılığı ve haber arama başlatılıyor ---")
-        results = {}
-
-        # Token ile ilgili tweet'leri arar
-        tweet_query = f"Market sentiment, price discussion, and social media buzz about {token_name} token."
-        tweet_filters = {"doc_type": "tweet", "tokens_mentioned": [token_name.lower()], "economic_significance_min": 1}
-        token_tweets = self.semantic_search(tweet_query, limit=limit, filters=tweet_filters)
-        results["token_tweets"] = token_tweets
-        print(f"✅ {len(token_tweets)} adet '{token_name}' ile ilgili tweet bulundu.")
-
-        # Token ile ilgili haberleri arar
-        news_query = f"Market analysis, price movements, and news about {token_name} token."
-        news_filters = {"doc_type": "news", "tokens_mentioned": [token_name.lower()], "economic_significance_min": 2}
-        token_news = self.semantic_search(news_query, limit=limit, filters=news_filters)
-        results["token_news"] = token_news
-        print(f"✅ {len(token_news)} adet '{token_name}' ile ilgili haber bulundu.")
-
-        return results
-
-    def get_player_earning_strategies(self, limit: int = 5) -> Dict[str, List[Document]]:
-        """
-        Başarılı oyuncuların tartıştığı kazanç stratejilerini ve token ekonomisiyle ilgili bilgileri getirir.
-        """
-        print("\n>>> Oyuncu kazanç stratejileri ve token ekonomisi arama başlatılıyor <<<")
-        results = {}
-
-        # Oyuncu stratejileri ile ilgili tweetleri ara
-        strategy_tweet_query = "Successful player earning strategies, tips, and gameplay tactics in Aurory."
-        strategy_tweet_filters = {"doc_type": "tweet", "economic_significance_min": 2} # Strateji odaklı tweetler
-        player_strategy_tweets = self.semantic_search(strategy_tweet_query, limit=limit, filters=strategy_tweet_filters)
-        results["player_strategy_tweets"] = player_strategy_tweets
-        print(f"✅ {len(player_strategy_tweets)} adet oyuncu stratejisi tweet'i bulundu.")
-
-        # Token ekonomisi ve oyun içi ekonomik bilgilerle ilgili haberleri ara
-        token_economy_news_query = "Aurory tokenomics, in-game economy, earning mechanisms, and game token utility."
-        token_economy_news_filters = {"doc_type": "news", "economic_significance_min": 3, "event_type": "tokenomics"}
-        token_economy_news = self.semantic_search(token_economy_news_query, limit=limit, filters=token_economy_news_filters)
-        results["token_economy_news"] = token_economy_news
-        print(f"✅ {len(token_economy_news)} adet token ekonomisi haberi bulundu.")
-
-        return results
-
-    def get_ecosystem_economic_risks(self, limit: int = 5) -> Dict[str, List[Document]]:
-        """
-        Aurory ekosistemi için ana ekonomik riskleri ve ilgili tartışmaları getirir.
-        """
-        print("\n>>> Aurory ekosistemi ekonomik riskleri arama başlatılıyor <<<")
-        results = {}
-
-        # Ekonomik risklerle ilgili haberleri ara
-        risk_news_query = "Economic risks, vulnerabilities, market threats, and stability concerns for Aurory ecosystem."
-        risk_news_filters = {"doc_type": "news", "economic_significance_min": 3} # Yüksek ekonomik önem taşıyan risk haberleri
-        risk_news = self.semantic_search(risk_news_query, limit=limit, filters=risk_news_filters)
-        results["risk_news"] = risk_news
-        print(f"✅ {len(risk_news)} adet ekonomik risk haberi bulundu.")
-
-        # Toplulukta risk tartışmaları ile ilgili tweetleri ara
-        community_risk_tweet_query = "Community concerns, FUD, security issues, and economic warnings about Aurory."
-        community_risk_tweet_filters = {"doc_type": "tweet", "economic_significance_min": 2} # Orta/yüksek ekonomik önem taşıyan topluluk tartışmaları
-        community_risk_tweets = self.semantic_search(community_risk_tweet_query, limit=limit, filters=community_risk_tweet_filters)
-        results["community_risk_tweets"] = community_risk_tweets
-        print(f"✅ {len(community_risk_tweets)} adet topluluk risk tartışması tweet'i bulundu.")
-
-        return results
-
+   
 def print_search_results(title: str, results: List[Document]):
     """Arama sonuçlarını düzenli bir şekilde yazdırır."""
     print(f"\n--- {title} ---")
