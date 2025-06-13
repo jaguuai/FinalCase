@@ -95,3 +95,5 @@ Relationship types established between nodes such as `Document`, `Token`, `Propo
 
 [![Neo4j Schema](chatbot.png)](https://github.com/jaguuai/FinalCase/blob/main/chatbot.png)
 
+For chatbot videos : https://drive.google.com/drive/folders/1AAZYgJ5D-afDS32kw8NqnezSmcln1HI9?usp=drive_link
+
